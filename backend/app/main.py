@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+
+from app.database.database import engine
 
 app = FastAPI(
     title="DESIDOC AI Knowledge Library",
     version="1.0.0",
-    description="Backend API for AI-powered Library Management System"
 )
 
 origins = [
@@ -19,8 +21,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def root():
-    return {
-        "message": "DESIDOC AI Knowledge Library Backend Running"
-    }
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+
+        return {
+            "status": "success",
+            "database": "Connected",
+            "message": "DESIDOC AI Backend Running"
+        }
+
+    except Exception as e:
+        return {
+            "status": "failed",
+            "database": "Not Connected",
+            "error": str(e)
+        }
