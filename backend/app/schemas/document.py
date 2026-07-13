@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from datetime import datetime
 
 
 class DocumentResponse(BaseModel):
@@ -7,10 +6,18 @@ class DocumentResponse(BaseModel):
     title: str
     author: str | None = None
     department: str | None = None
-    category: str | None = None
-    publication_year: int | None = None
-    file_name: str
-    file_path: str
+
+    # Frontend-friendly names
+    year: int | None = None
+    type: str | None = None
+
+    fileName: str
+    fileSize: str
+
+    # Placeholder values until AI pipeline is implemented
+    pages: int = 0
+    keywords: list[str] = []
+    bookmarked: bool = False
 
     class Config:
         from_attributes = True

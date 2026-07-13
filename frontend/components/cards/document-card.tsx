@@ -5,9 +5,11 @@ import { Bookmark, Download, Eye, FolderOpen, User, Calendar } from 'lucide-reac
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { docTypeIcons } from '@/lib/icons'
+import { docTypeIcons, fallbackIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { LibraryDocument } from '@/types'
+
+const API_BASE = "http://127.0.0.1:8000"
 
 interface DocumentCardProps {
   doc: LibraryDocument
@@ -16,7 +18,17 @@ interface DocumentCardProps {
 
 export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
   const [bookmarked, setBookmarked] = useState(doc.bookmarked)
-  const Icon = docTypeIcons[doc.type]
+
+  const Icon =
+    docTypeIcons[doc.type as keyof typeof docTypeIcons] ?? fallbackIcon
+
+  const openDocument = () => {
+    window.open(`${API_BASE}/documents/${doc.id}/view`, "_blank")
+  }
+
+  const downloadDocument = () => {
+    window.open(`${API_BASE}/documents/${doc.id}/download`, "_blank")
+  }
 
   if (view === 'list') {
     return (
@@ -24,22 +36,40 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
         <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-5" />
         </div>
+
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-foreground">{doc.title}</h3>
+            <h3 className="truncate text-sm font-semibold text-foreground">
+              {doc.title}
+            </h3>
+
             <Badge variant="secondary">{doc.type}</Badge>
           </div>
+
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {doc.author} · {doc.department} · {doc.year} · {doc.fileSize}
           </p>
         </div>
+
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" aria-label="Preview">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Preview"
+            onClick={openDocument}
+          >
             <Eye className="size-4" />
           </Button>
-          <Button variant="ghost" size="icon-sm" aria-label="Download">
+
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Download"
+            onClick={downloadDocument}
+          >
             <Download className="size-4" />
           </Button>
+
           <Button
             variant="ghost"
             size="icon-sm"
@@ -47,10 +77,19 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
             aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'}
           >
             <Bookmark
-              className={cn('size-4', bookmarked && 'fill-primary text-primary')}
+              className={cn(
+                'size-4',
+                bookmarked && 'fill-primary text-primary'
+              )}
             />
           </Button>
-          <Button variant="outline" size="sm" className="ml-1">
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="ml-1"
+            onClick={openDocument}
+          >
             Open
           </Button>
         </div>
@@ -64,31 +103,43 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
         <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-5" />
         </div>
+
         <button
           onClick={() => setBookmarked((b) => !b)}
           className="text-muted-foreground transition-colors hover:text-primary"
           aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'}
         >
-          <Bookmark className={cn('size-5', bookmarked && 'fill-primary text-primary')} />
+          <Bookmark
+            className={cn(
+              'size-5',
+              bookmarked && 'fill-primary text-primary'
+            )}
+          />
         </button>
       </div>
 
       <Badge variant="secondary" className="mt-4 w-fit">
         {doc.type}
       </Badge>
+
       <h3 className="mt-2 line-clamp-2 text-pretty text-sm font-semibold leading-snug text-foreground">
         {doc.title}
       </h3>
 
       <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
-          <User className="size-3.5" /> {doc.author}
+          <User className="size-3.5" />
+          {doc.author}
         </span>
+
         <span className="flex items-center gap-1.5">
-          <FolderOpen className="size-3.5" /> {doc.department}
+          <FolderOpen className="size-3.5" />
+          {doc.department}
         </span>
+
         <span className="flex items-center gap-1.5">
-          <Calendar className="size-3.5" /> {doc.year} · {doc.pages} pages · {doc.fileSize}
+          <Calendar className="size-3.5" />
+          {doc.year} · {doc.pages} pages · {doc.fileSize}
         </span>
       </div>
 
@@ -104,13 +155,29 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
       </div>
 
       <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-        <Button size="sm" className="flex-1">
+        <Button
+          size="sm"
+          className="flex-1"
+          onClick={openDocument}
+        >
           Open
         </Button>
-        <Button variant="outline" size="icon-sm" aria-label="Preview">
+
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="Preview"
+          onClick={openDocument}
+        >
           <Eye className="size-4" />
         </Button>
-        <Button variant="outline" size="icon-sm" aria-label="Download">
+
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="Download"
+          onClick={downloadDocument}
+        >
           <Download className="size-4" />
         </Button>
       </div>

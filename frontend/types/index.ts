@@ -5,17 +5,17 @@ export type DocumentType =
   | 'Scanned PDF'
 
 export interface LibraryDocument {
-  id: string
+  id: number
   title: string
   author: string
   year: number
   department: string
   keywords: string[]
-  type: DocumentType
+  type: string
+  fileName: string
   fileSize: string
   pages: number
   bookmarked: boolean
-  abstract: string
 }
 
 export interface StatCard {

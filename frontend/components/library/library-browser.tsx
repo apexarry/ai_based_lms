@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { LayoutGrid, List, SlidersHorizontal, X } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { SearchBar } from '@/components/search-bar'
@@ -9,12 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/states'
-import { documents, DEPARTMENTS, DOCUMENT_TYPES } from '@/lib/mock-data'
+import { DEPARTMENTS, DOCUMENT_TYPES } from '@/lib/mock-data'
+import { getDocuments } from '@/lib/api'
+import type { LibraryDocument } from '@/types'
 import { cn } from '@/lib/utils'
 
 const YEARS = ['All years', '2024', '2023', '2022', '2021', '2020', 'Older']
 const SORTS = ['Newest first', 'Oldest first', 'Title A–Z', 'Title Z–A']
-const AUTHORS = ['All authors', ...Array.from(new Set(documents.map((d) => d.author)))]
+
 
 export function LibraryBrowser() {
   const [query, setQuery] = useState('')
@@ -25,6 +27,25 @@ export function LibraryBrowser() {
   const [year, setYear] = useState('All years')
   const [type, setType] = useState('All types')
   const [sort, setSort] = useState('Newest first')
+  const [documents, setDocuments] = useState<LibraryDocument[]>([])
+
+  useEffect(() => {
+    async function fetchDocuments() {
+      try {
+        const data = await getDocuments()
+        setDocuments(data)
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    fetchDocuments()
+  }, [])
+
+  const AUTHORS = [
+    'All authors',
+    ...Array.from(new Set(documents.map((d) => d.author))),
+  ]
 
   const results = useMemo(() => {
     let list = documents.filter((d) => {
@@ -56,7 +77,7 @@ export function LibraryBrowser() {
       }
     })
     return list
-  }, [query, author, department, year, type, sort])
+  }, [documents, query, author, department, year, type, sort])
 
   const activeFilters = [
     author !== 'All authors' && author,
