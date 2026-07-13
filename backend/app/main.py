@@ -1,13 +1,21 @@
+from app.database.database import Base, engine
+import app.models
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.database.database import engine
+from app.routers.document_router import router as document_router
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DESIDOC AI Knowledge Library",
     version="1.0.0",
 )
+
+app.include_router(document_router)
 
 origins = [
     "http://localhost:3000",
