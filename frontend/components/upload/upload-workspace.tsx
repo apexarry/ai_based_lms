@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useRef, useState, useEffect } from "react"
 import {
   Upload,
   FileText,
@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { DEPARTMENTS, DOCUMENT_TYPES, uploadHistory } from "@/lib/mock-data"
+import { DEPARTMENTS, DOCUMENT_TYPES } from "@/lib/mock-data"
+import { getRecentUploads } from "@/lib/api"
 
 interface StagedFile {
   id: string
@@ -43,6 +44,8 @@ export function UploadWorkspace() {
   const [files, setFiles] = useState<StagedFile[]>([])
   const [submitted, setSubmitted] = useState(false)
 
+  const [recentUploads, setRecentUploads] = useState<any[]>([])
+
   const [title, setTitle] = useState("")
   const [author, setAuthor] = useState("")
   const [department, setDepartment] = useState(DEPARTMENTS[0])
@@ -50,6 +53,18 @@ export function UploadWorkspace() {
   const [year, setYear] = useState(2026)
 
   const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    async function loadUploads() {
+      try {
+        const data = await getRecentUploads()
+        setRecentUploads(data)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    loadUploads()
+  }, [])
 
   const addFiles = useCallback((list: FileList | null) => {
     if (!list) return
@@ -137,6 +152,9 @@ export function UploadWorkspace() {
       const data = await response.json()
 
       console.log(data)
+
+      const uploads = await getRecentUploads()
+      setRecentUploads(uploads)
 
       setSubmitted(true)
 
@@ -273,25 +291,17 @@ export function UploadWorkspace() {
                   </tr>
                 </thead>
                 <tbody>
-                  {uploadHistory.map((rec) => (
+                  {recentUploads.map((rec) => (
                     <tr key={rec.id} className="border-b border-border last:border-0">
                       <td className="max-w-[220px] px-5 py-3">
                         <p className="truncate font-medium text-foreground">{rec.title}</p>
                         <p className="truncate text-xs text-muted-foreground">{rec.department}</p>
                       </td>
                       <td className="px-5 py-3 text-muted-foreground">{rec.type}</td>
-                      <td className="px-5 py-3 text-muted-foreground">{rec.date}</td>
+                      <td className="px-5 py-3 text-muted-foreground">{rec.time}</td>
                       <td className="px-5 py-3">
-                        <Badge
-                          variant={
-                            rec.status === "Completed"
-                              ? "success"
-                              : rec.status === "Processing"
-                                ? "warning"
-                                : "destructive"
-                          }
-                        >
-                          {rec.status}
+                        <Badge variant="success">
+                          Uploaded
                         </Badge>
                       </td>
                     </tr>
