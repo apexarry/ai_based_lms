@@ -25,6 +25,7 @@ import { DEPARTMENTS, DOCUMENT_TYPES, uploadHistory } from "@/lib/mock-data"
 
 interface StagedFile {
   id: string
+  file: File
   name: string
   size: string
   progress: number
@@ -41,12 +42,20 @@ export function UploadWorkspace() {
   const [dragging, setDragging] = useState(false)
   const [files, setFiles] = useState<StagedFile[]>([])
   const [submitted, setSubmitted] = useState(false)
+
+  const [title, setTitle] = useState("")
+  const [author, setAuthor] = useState("")
+  const [department, setDepartment] = useState(DEPARTMENTS[0])
+  const [category, setCategory] = useState(DOCUMENT_TYPES[0])
+  const [year, setYear] = useState(2026)
+
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addFiles = useCallback((list: FileList | null) => {
     if (!list) return
     const next: StagedFile[] = Array.from(list).map((f) => ({
-      id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `${f.name}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      file: f,
       name: f.name,
       size: formatBytes(f.size),
       progress: 0,
@@ -94,10 +103,51 @@ export function UploadWorkspace() {
 
   const removeFile = (id: string) => setFiles((prev) => prev.filter((f) => f.id !== id))
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
-    setTimeout(() => setSubmitted(false), 3500)
+
+    if (files.length === 0) {
+      alert("Please select a document first.")
+      return
+    }
+
+    try {
+      const formData = new FormData()
+
+      formData.append("title", title)
+      formData.append("author", author)
+      formData.append("department", department)
+      formData.append("category", category)
+      formData.append("publication_year", year.toString())
+
+      formData.append("file", files[0].file)
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/documents/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const data = await response.json()
+
+      console.log(data)
+
+      setSubmitted(true)
+
+      setTimeout(() => {
+        setSubmitted(false)
+      }, 3000)
+
+    } catch (error) {
+      console.error(error)
+      alert("Upload failed.")
+    }
   }
 
   return (
@@ -276,16 +326,32 @@ export function UploadWorkspace() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Title</Label>
-                  <Input id="title" placeholder="e.g. Adaptive Beamforming for AESA Radar" required />
+                  <Input
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g. Adaptive Beamforming for AESA Radar"
+                      required
+                    />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="author">Author(s)</Label>
-                  <Input id="author" placeholder="e.g. Dr. A. Ramachandran" required />
+                  <Input
+                    id="author"
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    placeholder="e.g. Dr. A. Ramachandran"
+                    required
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor="type">Type</Label>
-                    <Select id="type" defaultValue="Research Paper">
+                    <Select
+                      id="type"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                    >
                       {DOCUMENT_TYPES.map((t) => (
                         <option key={t} value={t}>
                           {t}
@@ -295,12 +361,21 @@ export function UploadWorkspace() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="year">Year</Label>
-                    <Input id="year" type="number" placeholder="2026" defaultValue={2026} />
+                    <Input
+                      id="year"
+                      type="number"
+                      value={year}
+                      onChange={(e) => setYear(Number(e.target.value))}
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
-                  <Select id="department" defaultValue={DEPARTMENTS[0]}>
+                  <Select
+                    id="department"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                  >
                     {DEPARTMENTS.map((d) => (
                       <option key={d} value={d}>
                         {d}
