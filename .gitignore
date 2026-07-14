@@ -16,5 +16,12 @@ node_modules/
 .DS_Store
 Thumbs.db
 
-# Uploads (optional)
+# Uploads
 backend/uploads/
+
+# ChromaDB
+backend/chroma_db/
+
+# Python cache
+.pytest_cache/
+.mypy_cache/
