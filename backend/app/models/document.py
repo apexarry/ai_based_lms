@@ -2,6 +2,7 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
+    Text,
     ForeignKey,
     Boolean,
     DateTime,
@@ -36,6 +37,8 @@ class Document(Base):
     mime_type = Column(String(100))
 
     page_count = Column(Integer, default=0)
+
+    extracted_text = Column(Text)
 
     is_scanned = Column(Boolean, default=False)
 

@@ -1,11 +1,11 @@
 import os
 import shutil
 import uuid
-import fitz
 
+import fitz
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
-
+from app.services.rag_service import RAGService
 from app.models.document import Document
 
 
@@ -28,23 +28,26 @@ class DocumentService:
         os.makedirs(UPLOAD_DIR, exist_ok=True)
 
         extension = os.path.splitext(file.filename)[1]
-
         unique_name = f"{uuid.uuid4()}{extension}"
-
         file_path = os.path.join(UPLOAD_DIR, unique_name)
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
         page_count = 0
+        extracted_text = ""
 
         if file.content_type == "application/pdf":
             try:
-                pdf = fitz.open(file_path)
-                page_count = pdf.page_count
-                pdf.close()
+                with fitz.open(file_path) as pdf:
+
+                    page_count = pdf.page_count
+
+                    for page in pdf:
+                        extracted_text += page.get_text()
+
             except Exception as e:
-                print("Could not count pages:", e)
+                print("Could not process PDF:", e)
 
         document = Document(
             title=title,
@@ -57,12 +60,22 @@ class DocumentService:
             file_size=os.path.getsize(file_path),
             mime_type=file.content_type,
             page_count=page_count,
+            extracted_text=extracted_text,
         )
 
         db.add(document)
         db.commit()
         db.refresh(document)
+        if extracted_text.strip():
 
+            print("Indexing document into ChromaDB...")
+
+            # Make sure the document object has the extracted text
+            document.extracted_text = extracted_text
+
+            rag = RAGService()
+
+            rag.index_document(document)
         return document
 
     @staticmethod

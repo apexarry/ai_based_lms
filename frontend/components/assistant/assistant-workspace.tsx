@@ -19,26 +19,9 @@ import { conversations, suggestedPrompts } from "@/lib/mock-data"
 import type { ChatMessage, Citation } from "@/types"
 import { cn } from "@/lib/utils"
 
-const SAMPLE_CITATIONS: Citation[] = [
-  {
-    id: "sc1",
-    documentName: "Advanced Radar Signal Processing for Target Detection",
-    page: 12,
-    confidence: 0.96,
-    reference: "Ramachandran, A. (2024)",
-  },
-  {
-    id: "sc2",
-    documentName: "Metamaterial Antennas for Wideband Applications",
-    page: 8,
-    confidence: 0.81,
-    reference: "Banerjee, A. (2023)",
-  },
-]
 
-function buildAssistantReply(prompt: string): string {
-  return `Based on the DESIDOC knowledge base, here is a synthesis relevant to "${prompt.slice(0, 60)}":\n\nThe indexed literature converges on three key findings. First, adaptive techniques consistently outperform fixed approaches when operating in contested or noisy environments. Second, sensor fusion and multi-domain processing significantly improve robustness at the cost of computational load. Third, recent 2024 publications emphasise machine-learning-assisted methods that reduce manual tuning.\n\nI have attached the most relevant source documents below with page references and confidence scores.`
-}
+
+
 
 export function AssistantWorkspace() {
   const [historyOpen, setHistoryOpen] = useState(true)
@@ -66,31 +49,91 @@ export function AssistantWorkspace() {
     textareaRef.current?.focus()
   }
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
+
     const trimmed = text.trim()
+
     if (!trimmed || thinking) return
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
       content: trimmed,
-      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     }
+
     setMessages((prev) => [...prev, userMsg])
+
     setInput("")
+
     setThinking(true)
 
-    setTimeout(() => {
+    try {
+
+      const response = await fetch(
+        "http://127.0.0.1:8000/assistant/ask",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: trimmed,
+          }),
+        }
+      )
+
+      const data = await response.json()
+
+      const citations: Citation[] = data.sources.map(
+        (source: any, index: number) => ({
+          id: `${index}`,
+          documentName: source.title,
+          page: 0,
+          confidence: 1,
+          reference: `${source.author} (${source.publication_year})`,
+        })
+      )
+
       const reply: ChatMessage = {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: buildAssistantReply(trimmed),
-        citations: SAMPLE_CITATIONS,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        content: data.answer,
+        citations,
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       }
+
       setMessages((prev) => [...prev, reply])
+
+    } catch (err) {
+
+      console.error(err)
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: "Unable to connect to the AI backend.",
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        },
+      ])
+
+    } finally {
+
       setThinking(false)
-    }, 1400)
+
+    }
+
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
