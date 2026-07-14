@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+import fitz
 
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
@@ -35,6 +36,16 @@ class DocumentService:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        page_count = 0
+
+        if file.content_type == "application/pdf":
+            try:
+                pdf = fitz.open(file_path)
+                page_count = pdf.page_count
+                pdf.close()
+            except Exception as e:
+                print("Could not count pages:", e)
+
         document = Document(
             title=title,
             author=author,
@@ -45,6 +56,7 @@ class DocumentService:
             file_path=file_path,
             file_size=os.path.getsize(file_path),
             mime_type=file.content_type,
+            page_count=page_count,
         )
 
         db.add(document)

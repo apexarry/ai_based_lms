@@ -62,7 +62,7 @@ def get_documents(db: Session = Depends(get_db)):
             type=doc.category,
             fileName=doc.file_name,
             fileSize=format_size(doc.file_size),
-            pages=0,
+            pages=doc.page_count,
             keywords=[],
             bookmarked=False,
         )
