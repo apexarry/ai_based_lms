@@ -1,14 +1,23 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import (
+    APIRouter,
+    Depends,
+    UploadFile,
+    File,
+    Form,
+    HTTPException,
+)
 from fastapi.responses import FileResponse
-from app.models.document import Document
+from sqlalchemy.orm import Session
+
 from app.database.dependencies import get_db
-from app.services.document_service import DocumentService
+from app.models.document import Document
 from app.schemas.document import DocumentResponse
+from app.services.document_service import DocumentService
+
 
 router = APIRouter(
     prefix="/documents",
-    tags=["Documents"]
+    tags=["Documents"],
 )
 
 
@@ -21,6 +30,10 @@ def format_size(size: int) -> str:
         return f"{size / (1024 * 1024):.1f} MB"
 
 
+# ==========================================================
+# Upload
+# ==========================================================
+
 @router.post("/upload")
 def upload_document(
     title: str = Form(...),
@@ -31,6 +44,7 @@ def upload_document(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
+
     document = DocumentService.save_document(
         db=db,
         title=title,
@@ -48,8 +62,15 @@ def upload_document(
     }
 
 
+# ==========================================================
+# Get All Documents
+# ==========================================================
+
 @router.get("/", response_model=list[DocumentResponse])
-def get_documents(db: Session = Depends(get_db)):
+def get_documents(
+    db: Session = Depends(get_db),
+):
+
     documents = DocumentService.get_all_documents(db)
 
     return [
@@ -68,31 +89,66 @@ def get_documents(db: Session = Depends(get_db)):
         )
         for doc in documents
     ]
+
+
+@router.post("/reindex")
+def reindex_documents(
+    db: Session = Depends(get_db),
+):
+    """Rebuild all embeddings after an indexing-pipeline update."""
+    return DocumentService.reindex_documents(db)
+
+
+# ==========================================================
+# Download
+# ==========================================================
+
 @router.get("/{document_id}/download")
 def download_document(
     document_id: int,
     db: Session = Depends(get_db),
 ):
-    document = db.query(Document).filter(Document.id == document_id).first()
+
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
 
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
 
     return FileResponse(
         path=document.file_path,
         filename=document.file_name,
         media_type=document.mime_type,
     )
-    
+
+
+# ==========================================================
+# View
+# ==========================================================
+
 @router.get("/{document_id}/view")
 def view_document(
     document_id: int,
     db: Session = Depends(get_db),
 ):
-    document = db.query(Document).filter(Document.id == document_id).first()
+
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
 
     if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
 
     return FileResponse(
         path=document.file_path,
@@ -100,3 +156,29 @@ def view_document(
         filename=document.file_name,
         content_disposition_type="inline",
     )
+
+
+# ==========================================================
+# Delete
+# ==========================================================
+
+@router.delete("/{document_id}")
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+):
+
+    deleted = DocumentService.delete_document(
+        db=db,
+        document_id=document_id,
+    )
+
+    if not deleted:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    return {
+        "message": "Document deleted successfully.",
+    }

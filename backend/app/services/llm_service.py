@@ -1,11 +1,15 @@
 import os
 from pathlib import Path
 
-from groq import Groq
 from dotenv import load_dotenv
+from groq import Groq
 
+
+# Load .env file
 env_path = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(dotenv_path=env_path)
+
+
 class LLMService:
 
     def __init__(self):
@@ -19,27 +23,8 @@ class LLMService:
 
     def answer_question(
         self,
-        question: str,
-        context: str,
+        prompt: str,
     ):
-
-        prompt = f"""
-You are an AI assistant for the DESIDOC AI Knowledge Library.
-
-Answer ONLY from the provided context.
-
-If the answer is not present in the context, say:
-
-"I couldn't find the answer in the uploaded documents."
-
-Context:
-
-{context}
-
-Question:
-
-{question}
-"""
 
         response = self.client.chat.completions.create(
 
@@ -47,9 +32,13 @@ Question:
 
             messages=[
                 {
+                    "role": "system",
+                    "content": "You are an expert research assistant."
+                },
+                {
                     "role": "user",
                     "content": prompt,
-                }
+                },
             ],
 
             temperature=0.2,

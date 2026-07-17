@@ -25,3 +25,8 @@ backend/chroma_db/
 # Python cache
 .pytest_cache/
 .mypy_cache/
+
+
+# Development notes
+convo.txt
+devdocs.md

@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Bookmark, Download, Eye, FolderOpen, User, Calendar } from 'lucide-react'
+import { Bookmark, Download, Eye, FolderOpen, User, Calendar, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { docTypeIcons, fallbackIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { LibraryDocument } from '@/types'
+
 
 const API_BASE = "http://127.0.0.1:8000"
 
@@ -28,6 +29,41 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
 
   const downloadDocument = () => {
     window.open(`${API_BASE}/documents/${doc.id}/download`, "_blank")
+  }
+
+  const deleteDocument = async () => {
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${doc.title}"?\n\nThis action cannot be undone.`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+
+      const response = await fetch(
+        `${API_BASE}/documents/${doc.id}`,
+        {
+          method: "DELETE",
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error("Delete failed")
+      }
+
+
+      window.location.reload()
+
+    } catch (error) {
+
+      console.error(error)
+
+      alert("Could not delete document.")
+
+    }
   }
 
   if (view === 'list') {
@@ -68,6 +104,15 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
             onClick={downloadDocument}
           >
             <Download className="size-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Delete"
+            onClick={deleteDocument}
+          >
+            <Trash2 className="size-4 text-red-500" />
           </Button>
 
           <Button
@@ -179,6 +224,15 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
           onClick={downloadDocument}
         >
           <Download className="size-4" />
+        </Button>
+
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label="Delete"
+          onClick={deleteDocument}
+        >
+          <Trash2 className="size-4 text-red-500" />
         </Button>
       </div>
     </Card>

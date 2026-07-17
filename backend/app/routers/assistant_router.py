@@ -1,44 +1,90 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
+from app.database.dependencies import get_db
 from app.schemas.assistant import QuestionRequest
-from app.services.embedding_service import EmbeddingService
-from app.services.chroma_service import ChromaService
+
+from app.services.retrieval_service import RetrievalService
+from app.services.prompt_builder_service import PromptBuilderService
 from app.services.llm_service import LLMService
+
 
 router = APIRouter(
     prefix="/assistant",
     tags=["Assistant"],
 )
 
-embedding_service = EmbeddingService()
-chroma = ChromaService()
+
+retrieval_service = RetrievalService()
+prompt_builder = PromptBuilderService()
 llm = LLMService()
 
 
 @router.post("/ask")
-def ask_question(request: QuestionRequest):
+def ask_question(
+    request: QuestionRequest,
+    db: Session = Depends(get_db),
+):
 
-    question_embedding = embedding_service.generate_embedding(
-        request.question
+    # ==========================================================
+    # Retrieve documents + query understanding
+    # ==========================================================
+
+    retrieval = retrieval_service.retrieve(
+        question=request.question,
+        db=db,
     )
 
-    results = chroma.search(
-        question_embedding,
-        n_results=5,
-    )
+    query = retrieval["query"]
+    results = retrieval["results"]
+
+    # ==========================================================
+    # No documents found
+    # ==========================================================
+
+    if (
+        not results["documents"]
+        or not results["documents"][0]
+    ):
+        return {
+            "question": request.question,
+            "answer": "I couldn't find any relevant documents.",
+            "sources": [],
+        }
 
     documents = results["documents"][0]
     metadata = results["metadatas"][0]
 
-    context = "\n\n".join(documents)
-
-    answer = llm.answer_question(
-        request.question,
-        context,
+    context = "\n\n".join(
+        f"[Source: {item.get('title', 'Untitled document')} | "
+        f"Chunk {item.get('chunk_id', 0) + 1}]\n{chunk}"
+        for chunk, item in zip(documents, metadata)
     )
 
-    sources = []
+    # ==========================================================
+    # Build prompt
+    # ==========================================================
 
+    prompt = prompt_builder.build_prompt(
+        question=request.question,
+        context=context,
+        intent=query["intent"],
+        document=query["document"],
+    )
+
+    # ==========================================================
+    # Generate answer
+    # ==========================================================
+
+    answer = llm.answer_question(
+        prompt=prompt,
+    )
+
+    # ==========================================================
+    # Prepare sources
+    # ==========================================================
+
+    sources = []
     seen = set()
 
     for item in metadata:
@@ -62,6 +108,10 @@ def ask_question(request: QuestionRequest):
                 "publication_year": item["publication_year"],
             }
         )
+
+    # ==========================================================
+    # Response
+    # ==========================================================
 
     return {
         "question": request.question,

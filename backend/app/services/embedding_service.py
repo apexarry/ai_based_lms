@@ -8,4 +8,11 @@ class EmbeddingService:
         )
 
     def generate_embedding(self, text: str):
-        return self.model.encode(text).tolist()
+        return self.model.encode(text, normalize_embeddings=True).tolist()
+
+    def generate_embeddings(self, texts: list[str]):
+        return self.model.encode(
+            texts,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        ).tolist()

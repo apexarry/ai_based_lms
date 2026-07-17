@@ -7,12 +7,53 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.services.rag_service import RAGService
 from app.models.document import Document
-
+from app.services.chroma_service import ChromaService
 
 UPLOAD_DIR = "uploads"
 
 
 class DocumentService:
+
+    @staticmethod
+    def delete_document(
+        db: Session,
+        document_id: int,
+    ):
+
+        document = (
+            db.query(Document)
+            .filter(Document.id == document_id)
+            .first()
+        )
+
+        if not document:
+            return False
+
+        # -----------------------------------------
+        # Delete vectors from ChromaDB
+        # -----------------------------------------
+
+        chroma = ChromaService()
+        chroma.delete_document(document.id)
+
+        # -----------------------------------------
+        # Delete PDF from uploads folder
+        # -----------------------------------------
+
+        if (
+            document.file_path
+            and os.path.exists(document.file_path)
+        ):
+            os.remove(document.file_path)
+
+        # -----------------------------------------
+        # Delete database record
+        # -----------------------------------------
+
+        db.delete(document)
+        db.commit()
+
+        return True
 
     @staticmethod
     def save_document(
@@ -74,10 +115,31 @@ class DocumentService:
             document.extracted_text = extracted_text
 
             rag = RAGService()
-
             rag.index_document(document)
+            db.commit()
+            db.refresh(document)
         return document
 
     @staticmethod
     def get_all_documents(db: Session):
         return db.query(Document).all()
+
+    @staticmethod
+    def reindex_documents(db: Session):
+        """Rebuild vectors so existing uploads benefit from indexing changes."""
+        indexed, skipped, failed = 0, 0, []
+        rag = RAGService()
+
+        for document in db.query(Document).all():
+            if not (document.extracted_text or "").strip():
+                skipped += 1
+                continue
+            try:
+                rag.index_document(document)
+                db.commit()
+                indexed += 1
+            except Exception as exc:
+                db.rollback()
+                failed.append({"id": document.id, "title": document.title, "error": str(exc)})
+
+        return {"indexed": indexed, "skipped": skipped, "failed": failed}
