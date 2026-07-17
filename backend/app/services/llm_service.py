@@ -23,24 +23,19 @@ class LLMService:
 
     def answer_question(
         self,
-        prompt: str,
+        prompt: str | None = None,
+        messages: list | None = None,
     ):
 
+        if messages is None:
+            messages = [
+                {"role": "system", "content": "You are an expert research assistant."},
+                {"role": "user", "content": prompt or ""},
+            ]
+
         response = self.client.chat.completions.create(
-
             model="llama-3.3-70b-versatile",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are an expert research assistant."
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-
+            messages=messages,
             temperature=0.2,
         )
 

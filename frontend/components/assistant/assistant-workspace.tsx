@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   Bot,
   Send,
@@ -11,22 +11,40 @@ import {
   MessageSquare,
   PanelLeft,
   Paperclip,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MessageBubble } from "@/components/assistant/message-bubble"
-import { conversations, suggestedPrompts } from "@/lib/mock-data"
+import { suggestedPrompts } from "@/lib/mock-data"
 import type { ChatMessage, Citation } from "@/types"
+import type { ConversationSummary, ChatMessageData } from "@/lib/api"
+import {
+  getConversations,
+  getConversation,
+  createConversation,
+  deleteConversation,
+  askQuestion,
+} from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-
-
-
+function toChatMessage(m: ChatMessageData, idx: number): ChatMessage {
+  return {
+    id: m.id?.toString() ?? `msg-${idx}`,
+    role: m.role,
+    content: m.content,
+    citations: m.citations ?? [],
+    timestamp: m.timestamp
+      ? new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "",
+  }
+}
 
 export function AssistantWorkspace() {
   const [historyOpen, setHistoryOpen] = useState(true)
-  const [activeId, setActiveId] = useState(conversations[0].id)
-  const [messages, setMessages] = useState<ChatMessage[]>(conversations[0].messages)
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [activeId, setActiveId] = useState<number | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [thinking, setThinking] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -36,63 +54,100 @@ export function AssistantWorkspace() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })
   }, [messages, thinking])
 
-  const selectConversation = (id: string) => {
-    const conv = conversations.find((c) => c.id === id)
+  useEffect(() => {
+    getConversations().then((list) => {
+      setConversations(list)
+      if (list.length > 0) {
+        setActiveId(list[0].id)
+        getConversation(list[0].id).then((detail) => {
+          setMessages(detail.messages.map(toChatMessage))
+        })
+      }
+    }).catch(console.error)
+  }, [])
+
+  const selectConversation = useCallback(async (id: number) => {
     setActiveId(id)
-    setMessages(conv?.messages ?? [])
-  }
-
-  const startNew = () => {
-    setActiveId("")
     setMessages([])
-    setInput("")
-    textareaRef.current?.focus()
-  }
+    try {
+      const detail = await getConversation(id)
+      setMessages(detail.messages.map(toChatMessage))
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
 
-  const send = async (text: string) => {
+  const startNew = useCallback(async () => {
+    try {
+      const conv = await createConversation()
+      setConversations((prev) => [conv, ...prev])
+      setActiveId(conv.id)
+      setMessages([])
+      setInput("")
+      textareaRef.current?.focus()
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
 
+  const handleDelete = useCallback(async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await deleteConversation(id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (activeId === id) {
+        const next = conversations.find((c) => c.id !== id)
+        if (next) {
+          setActiveId(next.id)
+          const detail = await getConversation(next.id)
+          setMessages(detail.messages.map(toChatMessage))
+        } else {
+          setActiveId(null)
+          setMessages([])
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [activeId, conversations])
+
+  const send = useCallback(async (text: string) => {
     const trimmed = text.trim()
-
     if (!trimmed || thinking) return
+
+    let convId = activeId
+
+    if (!convId) {
+      try {
+        const conv = await createConversation()
+        setConversations((prev) => [conv, ...prev])
+        convId = conv.id
+        setActiveId(conv.id)
+      } catch (err) {
+        console.error(err)
+        return
+      }
+    }
 
     const userMsg: ChatMessage = {
       id: `u-${Date.now()}`,
       role: "user",
       content: trimmed,
-      timestamp: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
 
     setMessages((prev) => [...prev, userMsg])
-
     setInput("")
-
     setThinking(true)
 
     try {
+      const data = await askQuestion(trimmed, convId)
 
-      const response = await fetch(
-        "http://127.0.0.1:8000/assistant/ask",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            question: trimmed,
-          }),
-        }
-      )
-
-      const data = await response.json()
-
-      const citations: Citation[] = data.sources.map(
+      const citations: Citation[] = (data.sources ?? []).map(
         (source: any, index: number) => ({
           id: `${index}`,
           documentName: source.title,
-          page: 0,
+          page: source.page_start ?? 0,
           confidence: 1,
           reference: `${source.author} (${source.publication_year})`,
         })
@@ -103,38 +158,29 @@ export function AssistantWorkspace() {
         role: "assistant",
         content: data.answer,
         citations,
-        timestamp: new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       }
 
       setMessages((prev) => [...prev, reply])
 
+      const updated = await getConversations()
+      setConversations(updated)
+
     } catch (err) {
-
       console.error(err)
-
       setMessages((prev) => [
         ...prev,
         {
           id: `a-${Date.now()}`,
           role: "assistant",
           content: "Unable to connect to the AI backend.",
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ])
-
     } finally {
-
       setThinking(false)
-
     }
-
-  }
+  }, [activeId, thinking])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -167,7 +213,7 @@ export function AssistantWorkspace() {
               key={conv.id}
               onClick={() => selectConversation(conv.id)}
               className={cn(
-                "flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left transition-colors",
+                "group flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left transition-colors",
                 activeId === conv.id ? "bg-primary/10" : "hover:bg-muted",
               )}
             >
@@ -180,12 +226,16 @@ export function AssistantWorkspace() {
                 />
                 <span
                   className={cn(
-                    "truncate text-sm font-medium",
+                    "flex-1 truncate text-sm font-medium",
                     activeId === conv.id ? "text-primary" : "text-foreground",
                   )}
                 >
                   {conv.title}
                 </span>
+                <Trash2
+                  className="hidden size-3 shrink-0 text-muted-foreground/50 hover:text-red-500 group-hover:inline"
+                  onClick={(e) => handleDelete(conv.id, e)}
+                />
               </span>
               <span className="truncate pl-5 text-xs text-muted-foreground">{conv.preview}</span>
               <span className="pl-5 text-[11px] text-muted-foreground/70">{conv.date}</span>
@@ -231,7 +281,7 @@ export function AssistantWorkspace() {
                 Ask the DESIDOC Knowledge Assistant
               </h2>
               <p className="mt-2 max-w-md text-sm text-muted-foreground text-pretty">
-                Search across 48,000+ indexed documents. Get summaries, comparisons, and citations
+                Search across indexed documents. Get summaries, comparisons, and citations
                 grounded in the defence research corpus.
               </p>
               <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -248,8 +298,8 @@ export function AssistantWorkspace() {
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
-              {messages.map((m) => (
-                <MessageBubble key={m.id} message={m} />
+              {messages.map((m, i) => (
+                <MessageBubble key={m.id ?? i} message={m} />
               ))}
               {thinking && (
                 <div className="flex gap-3">

@@ -44,6 +44,10 @@ class Document(Base):
 
     ocr_completed = Column(Boolean, default=False)
 
+    ocr_page_total = Column(Integer, nullable=True)
+
+    ocr_page_current = Column(Integer, nullable=True)
+
     embedding_completed = Column(Boolean, default=False)
 
     owner_id = Column(Integer, ForeignKey("users.id"))

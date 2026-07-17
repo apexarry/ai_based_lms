@@ -3,11 +3,12 @@ import shutil
 import uuid
 
 import fitz
-from fastapi import UploadFile
+from fastapi import UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.services.rag_service import RAGService
 from app.models.document import Document
 from app.services.chroma_service import ChromaService
+from app.services.ocr_service import OcrService
 
 UPLOAD_DIR = "uploads"
 
@@ -64,6 +65,7 @@ class DocumentService:
         category: str,
         publication_year: int,
         file: UploadFile,
+        background_tasks: BackgroundTasks | None = None,
     ):
 
         os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -83,12 +85,32 @@ class DocumentService:
                 with fitz.open(file_path) as pdf:
 
                     page_count = pdf.page_count
+                    pages_text = []
 
-                    for page in pdf:
-                        extracted_text += page.get_text()
+                    for i, page in enumerate(pdf):
+                        text = page.get_text().strip()
+                        if text:
+                            pages_text.append(f"--- PAGE {i + 1} ---\n{text}")
+
+                    extracted_text = "\n\n".join(pages_text)
 
             except Exception as e:
                 print("Could not process PDF:", e)
+
+        is_scanned = False
+        needs_ocr = False
+        ocr_status = "text"
+
+        if (
+            file.content_type == "application/pdf"
+            and page_count > 0
+        ):
+            text_len = len(extracted_text.strip())
+            is_scanned = text_len < page_count * 20
+
+            if is_scanned:
+                needs_ocr = True
+                ocr_status = "pending"
 
         document = Document(
             title=title,
@@ -102,22 +124,38 @@ class DocumentService:
             mime_type=file.content_type,
             page_count=page_count,
             extracted_text=extracted_text,
+            is_scanned=is_scanned,
+            ocr_completed=False,
         )
 
         db.add(document)
         db.commit()
         db.refresh(document)
-        if extracted_text.strip():
+
+        if needs_ocr and background_tasks:
+            doc_id = document.id
+            doc_path = file_path
+            background_tasks.add_task(
+                OcrService.process_document_background,
+                document_id=doc_id,
+                file_path=doc_path,
+                page_count=page_count,
+            )
+            document.ocr_page_total = page_count
+            print(f"Queued OCR for document {doc_id} ({title}) — {page_count} pages")
+
+        elif extracted_text.strip():
 
             print("Indexing document into ChromaDB...")
 
-            # Make sure the document object has the extracted text
             document.extracted_text = extracted_text
 
             rag = RAGService()
             rag.index_document(document)
             db.commit()
             db.refresh(document)
+
+        document.ocr_status = ocr_status
         return document
 
     @staticmethod

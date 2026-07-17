@@ -30,16 +30,36 @@ export function LibraryBrowser() {
   const [documents, setDocuments] = useState<LibraryDocument[]>([])
 
   useEffect(() => {
+    let cancelled = false
+    let interval: ReturnType<typeof setInterval> | null = null
+
     async function fetchDocuments() {
       try {
         const data = await getDocuments()
-        setDocuments(data)
+        if (!cancelled) setDocuments(data)
       } catch (error) {
         console.error(error)
       }
     }
 
     fetchDocuments()
+
+    interval = setInterval(async () => {
+      const data = await getDocuments()
+      if (!cancelled) {
+        setDocuments(data)
+        const hasPending = data.some((d) => d.ocr_status === 'pending')
+        if (!hasPending && interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      }
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      if (interval) clearInterval(interval)
+    }
   }, [])
 
   const AUTHORS = [

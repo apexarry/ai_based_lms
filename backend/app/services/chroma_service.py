@@ -31,11 +31,18 @@ class ChromaService:
             department, publication_year, [chunk_id],
         )
 
-    def add_chunks(self, document_id, chunks, embeddings, title, author,
-                   category, department, publication_year, chunk_ids=None):
+    def add_chunks(
+        self, document_id, chunks, embeddings, title, author,
+        category, department, publication_year,
+        chunk_ids=None, sections=None, page_starts=None, page_ends=None,
+    ):
         """Store all chunks together with metadata Chroma accepts (never None)."""
         chunk_ids = chunk_ids or list(range(len(chunks)))
-        metadata = {
+        sections = sections or [None] * len(chunks)
+        page_starts = page_starts or [None] * len(chunks)
+        page_ends = page_ends or [None] * len(chunks)
+
+        base = {
             "document_id": document_id,
             "title": title or "Untitled document",
             "author": author or "Unknown",
@@ -43,11 +50,23 @@ class ChromaService:
             "department": department or "Unknown",
             "publication_year": publication_year or 0,
         }
+
+        metadatas = []
+        for i, chunk_id in enumerate(chunk_ids):
+            meta = {**base, "chunk_id": chunk_id}
+            if sections[i]:
+                meta["section"] = sections[i]
+            if page_starts[i] is not None:
+                meta["page_start"] = page_starts[i]
+            if page_ends[i] is not None:
+                meta["page_end"] = page_ends[i]
+            metadatas.append(meta)
+
         self.collection.add(
             ids=[f"{document_id}_{chunk_id}" for chunk_id in chunk_ids],
             embeddings=embeddings,
             documents=chunks,
-            metadatas=[{**metadata, "chunk_id": chunk_id} for chunk_id in chunk_ids],
+            metadatas=metadatas,
         )
 
     def search(
@@ -71,19 +90,17 @@ class ChromaService:
     def get_document_chunks(
         self,
         document_id: int,
+        include_embeddings: bool = False,
     ):
-        """
-        Fetch ALL chunks for a document.
-        """
+        include = ["documents", "metadatas"]
+        if include_embeddings:
+            include.append("embeddings")
 
         results = self.collection.get(
             where={
                 "document_id": document_id,
             },
-            include=[
-                "documents",
-                "metadatas",
-            ],
+            include=include,
         )
 
         combined = list(
@@ -96,6 +113,10 @@ class ChromaService:
         combined.sort(
             key=lambda x: x[1]["chunk_id"]
         )
+
+        if include_embeddings:
+            embeddings = results.get("embeddings", [])
+            return combined, embeddings
 
         return combined
     def delete_document(

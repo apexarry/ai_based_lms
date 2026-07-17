@@ -84,3 +84,89 @@ export async function getRecentUploads(): Promise<RecentUpload[]> {
 
   return response.json()
 }
+
+export interface Recommendation {
+  id: number
+  title: string
+  author: string
+  department: string
+  type: string
+  year: number
+  summary?: string
+}
+
+export interface ConversationSummary {
+  id: number
+  title: string
+  preview: string
+  date: string
+}
+
+export interface ChatMessageData {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+  citations: any[]
+  timestamp: string
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: ChatMessageData[]
+}
+
+export async function getConversations(): Promise<ConversationSummary[]> {
+  const res = await fetch(`${API_BASE}/conversations/`)
+  if (!res.ok) throw new Error("Failed to fetch conversations")
+  return res.json()
+}
+
+export async function createConversation(): Promise<ConversationSummary> {
+  const res = await fetch(`${API_BASE}/conversations/`, { method: "POST" })
+  if (!res.ok) throw new Error("Failed to create conversation")
+  return res.json()
+}
+
+export async function getConversation(id: number): Promise<ConversationDetail> {
+  const res = await fetch(`${API_BASE}/conversations/${id}`)
+  if (!res.ok) throw new Error("Failed to fetch conversation")
+  return res.json()
+}
+
+export async function updateConversation(id: number, body: { title?: string; preview?: string }) {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error("Failed to update conversation")
+  return res.json()
+}
+
+export async function deleteConversation(id: number) {
+  const res = await fetch(`${API_BASE}/conversations/${id}`, { method: "DELETE" })
+  if (!res.ok) throw new Error("Failed to delete conversation")
+  return res.json()
+}
+
+export async function askQuestion(question: string, conversationId?: number | null) {
+  const res = await fetch(`${API_BASE}/assistant/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      question,
+      conversation_id: conversationId ?? null,
+    }),
+  })
+  if (!res.ok) throw new Error("Failed to get answer")
+  return res.json()
+}
+
+export async function getRecommendations(): Promise<Recommendation[]> {
+  const response = await fetch(`${API_BASE}/recommendations/`)
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch recommendations")
+  }
+
+  return response.json()
+}

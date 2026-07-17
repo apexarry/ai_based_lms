@@ -80,6 +80,12 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
             </h3>
 
             <Badge variant="secondary">{doc.type}</Badge>
+
+            {doc.ocr_status === 'pending' && doc.ocr_page_total && (
+              <span className="text-[11px] text-muted-foreground">
+                OCR: {doc.ocr_page_current ?? 0}/{doc.ocr_page_total}
+              </span>
+            )}
           </div>
 
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -166,6 +172,21 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
       <Badge variant="secondary" className="mt-4 w-fit">
         {doc.type}
       </Badge>
+
+      {doc.ocr_status === 'pending' && doc.ocr_page_total && (
+        <div className="mt-2 space-y-1">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>OCR: {doc.ocr_page_current ?? 0}/{doc.ocr_page_total} pages</span>
+            <span>{Math.round(((doc.ocr_page_current ?? 0) / doc.ocr_page_total) * 100)}%</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-500"
+              style={{ width: `${((doc.ocr_page_current ?? 0) / doc.ocr_page_total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <h3 className="mt-2 line-clamp-2 text-pretty text-sm font-semibold leading-snug text-foreground">
         {doc.title}

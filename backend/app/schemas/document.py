@@ -19,5 +19,11 @@ class DocumentResponse(BaseModel):
     keywords: list[str] = []
     bookmarked: bool = False
 
+    ocr_status: str = "text"
+
+    ocr_page_current: int | None = None
+
+    ocr_page_total: int | None = None
+
     class Config:
         from_attributes = True

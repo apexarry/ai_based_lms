@@ -54,6 +54,13 @@ def get_recent_uploads(db: Session = Depends(get_db)):
         .all()
     )
 
+    def derive_ocr_status(doc) -> str:
+        if not doc.is_scanned:
+            return "text"
+        if doc.ocr_completed:
+            return "completed"
+        return "pending"
+
     return [
         {
             "id": doc.id,
@@ -61,6 +68,9 @@ def get_recent_uploads(db: Session = Depends(get_db)):
             "author": doc.author,
             "type": doc.category,
             "time": "Just now",
+            "ocr_status": derive_ocr_status(doc),
+            "ocr_page_current": doc.ocr_page_current,
+            "ocr_page_total": doc.ocr_page_total,
         }
         for doc in documents
     ]

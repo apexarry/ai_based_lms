@@ -9,6 +9,8 @@ from app.database.database import engine
 from app.routers.document_router import router as document_router
 from app.routers.dashboard_router import router as dashboard_router
 from app.routers.assistant_router import router as assistant_router
+from app.routers.recommendations_router import router as recommendations_router
+from app.routers.conversations_router import router as conversations_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,6 +22,8 @@ app = FastAPI(
 app.include_router(document_router)
 app.include_router(dashboard_router)
 app.include_router(assistant_router)
+app.include_router(recommendations_router)
+app.include_router(conversations_router)
 
 origins = [
     "http://localhost:3000",

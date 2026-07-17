@@ -55,15 +55,36 @@ export function UploadWorkspace() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    let cancelled = false
+    let interval: ReturnType<typeof setInterval> | null = null
+
     async function loadUploads() {
       try {
         const data = await getRecentUploads()
-        setRecentUploads(data)
+        if (!cancelled) setRecentUploads(data)
       } catch (err) {
         console.error(err)
       }
     }
+
     loadUploads()
+
+    interval = setInterval(async () => {
+      const data = await getRecentUploads()
+      if (!cancelled) {
+        setRecentUploads(data)
+        const hasPending = data.some((r: any) => r.ocr_status === 'pending')
+        if (!hasPending && interval) {
+          clearInterval(interval)
+          interval = null
+        }
+      }
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      if (interval) clearInterval(interval)
+    }
   }, [])
 
   const addFiles = useCallback((list: FileList | null) => {
@@ -300,9 +321,20 @@ export function UploadWorkspace() {
                       <td className="px-5 py-3 text-muted-foreground">{rec.type}</td>
                       <td className="px-5 py-3 text-muted-foreground">{rec.time}</td>
                       <td className="px-5 py-3">
-                        <Badge variant="success">
-                          Uploaded
-                        </Badge>
+                        {rec.ocr_status === 'pending' ? (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">OCR</Badge>
+                            {rec.ocr_page_total && (
+                              <span className="text-xs tabular-nums text-muted-foreground">
+                                {rec.ocr_page_current ?? 0}/{rec.ocr_page_total}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="success">
+                            Uploaded
+                          </Badge>
+                        )}
                       </td>
                     </tr>
                   ))}

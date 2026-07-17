@@ -5,6 +5,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    BackgroundTasks,
 )
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -42,6 +43,7 @@ def upload_document(
     category: str = Form(""),
     publication_year: int = Form(...),
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
 ):
 
@@ -53,12 +55,14 @@ def upload_document(
         category=category,
         publication_year=publication_year,
         file=file,
+        background_tasks=background_tasks,
     )
 
     return {
         "id": document.id,
         "title": document.title,
         "uploaded": True,
+        "ocr_status": getattr(document, "ocr_status", "text"),
     }
 
 
@@ -73,6 +77,13 @@ def get_documents(
 
     documents = DocumentService.get_all_documents(db)
 
+    def derive_ocr_status(doc) -> str:
+        if not doc.is_scanned:
+            return "text"
+        if doc.ocr_completed:
+            return "completed"
+        return "pending"
+
     return [
         DocumentResponse(
             id=doc.id,
@@ -86,6 +97,9 @@ def get_documents(
             pages=doc.page_count,
             keywords=[],
             bookmarked=False,
+            ocr_status=derive_ocr_status(doc),
+            ocr_page_current=doc.ocr_page_current,
+            ocr_page_total=doc.ocr_page_total,
         )
         for doc in documents
     ]
