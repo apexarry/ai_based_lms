@@ -16,6 +16,7 @@ export interface LibraryDocument {
   fileSize: string
   pages: number
   bookmarked: boolean
+  owner_id?: number | null
   ocr_status?: 'text' | 'pending' | 'completed'
   ocr_page_current?: number | null
   ocr_page_total?: number | null

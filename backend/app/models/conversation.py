@@ -22,6 +22,8 @@ class Conversation(Base):
 
     preview = Column(String(500), default="")
 
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

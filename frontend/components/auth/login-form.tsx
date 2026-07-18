@@ -6,37 +6,46 @@ import { Eye, EyeOff, Loader2, User, Lock, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { login } from '@/lib/api'
+import { useAuth } from '@/lib/auth-context'
 
 export function LoginForm() {
+  const { login } = useAuth()
   const router = useRouter()
-  const [username, setUsername] = useState('a.mehta')
-  const [password, setPassword] = useState('demo1234')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    // Placeholder auth — replace with FastAPI call in lib/api.ts
-    await login(username, password)
-    router.push('/dashboard')
+    setError('')
+    try {
+      await login(email, password)
+      router.push('/dashboard')
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="username">Username</Label>
+        <Label htmlFor="email">Email</Label>
         <div className="relative">
           <User className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your username"
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
             className="pl-9"
-            autoComplete="username"
+            autoComplete="email"
             required
           />
         </div>
@@ -85,6 +94,10 @@ export function LoginForm() {
         Remember me on this device
       </label>
 
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
+
       <Button type="submit" size="lg" className="w-full" disabled={loading}>
         {loading ? (
           <>
@@ -98,6 +111,13 @@ export function LoginForm() {
           </>
         )}
       </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{' '}
+        <a href="/register" className="font-medium text-primary hover:underline">
+          Register
+        </a>
+      </p>
     </form>
   )
 }

@@ -158,10 +158,12 @@ export function UploadWorkspace() {
 
       formData.append("file", files[0].file)
 
+      const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
       const response = await fetch(
         "http://127.0.0.1:8000/documents/upload",
         {
           method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: formData,
         }
       )

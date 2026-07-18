@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { LayoutGrid, List, SlidersHorizontal, X } from 'lucide-react'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { LayoutGrid, List, SlidersHorizontal, X, Bookmark } from 'lucide-react'
 import { PageHeader } from '@/components/page-header'
 import { SearchBar } from '@/components/search-bar'
 import { DocumentCard } from '@/components/cards/document-card'
@@ -19,6 +20,9 @@ const SORTS = ['Newest first', 'Oldest first', 'Title A–Z', 'Title Z–A']
 
 
 export function LibraryBrowser() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const bookmarkedOnly = searchParams.get('bookmarked') === 'true'
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [showFilters, setShowFilters] = useState(true)
@@ -69,6 +73,7 @@ export function LibraryBrowser() {
 
   const results = useMemo(() => {
     let list = documents.filter((d) => {
+      if (bookmarkedOnly && !d.bookmarked) return false
       const q = query.toLowerCase()
       const matchesQuery =
         !q ||
@@ -117,9 +122,20 @@ export function LibraryBrowser() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Digital Library"
-        description={`${documents.length.toLocaleString()} documents across ${DEPARTMENTS.length} departments`}
-      />
+        title={bookmarkedOnly ? 'Bookmarked Documents' : 'Digital Library'}
+        description={
+          bookmarkedOnly
+            ? `${results.length} bookmarked document${results.length === 1 ? '' : 's'}`
+            : `${documents.length.toLocaleString()} documents across ${DEPARTMENTS.length} departments`
+        }
+      >
+        {bookmarkedOnly && (
+          <Button variant="outline" size="sm" onClick={() => router.push('/library')}>
+            <Bookmark className="size-4" />
+            All Documents
+          </Button>
+        )}
+      </PageHeader>
 
       {/* Toolbar */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

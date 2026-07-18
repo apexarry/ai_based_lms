@@ -7,6 +7,7 @@ from fastapi import UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.services.rag_service import RAGService
 from app.models.document import Document
+from app.models.document_view import DocumentView
 from app.services.chroma_service import ChromaService
 from app.services.ocr_service import OcrService
 
@@ -48,6 +49,14 @@ class DocumentService:
             os.remove(document.file_path)
 
         # -----------------------------------------
+        # Delete related view records
+        # -----------------------------------------
+
+        db.query(DocumentView).filter(
+            DocumentView.document_id == document.id
+        ).delete()
+
+        # -----------------------------------------
         # Delete database record
         # -----------------------------------------
 
@@ -66,6 +75,7 @@ class DocumentService:
         publication_year: int,
         file: UploadFile,
         background_tasks: BackgroundTasks | None = None,
+        owner_id: int | None = None,
     ):
 
         os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -126,6 +136,7 @@ class DocumentService:
             extracted_text=extracted_text,
             is_scanned=is_scanned,
             ocr_completed=False,
+            owner_id=owner_id,
         )
 
         db.add(document)

@@ -8,7 +8,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { SearchDropdown } from '@/components/search-dropdown'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { breadcrumbLabels } from '@/lib/nav'
-import { userProfile } from '@/lib/mock-data'
+import { useAuth } from '@/lib/auth-context'
 
 interface NavbarProps {
   onOpenMobile: () => void
@@ -18,6 +18,10 @@ export function Navbar({ onOpenMobile }: NavbarProps) {
   const pathname = usePathname()
   const segments = pathname.split('/').filter(Boolean)
   const current = segments[0] ?? 'dashboard'
+  const { user } = useAuth()
+  const initials = user?.name
+    ? user.name.split(' ').map((p: string) => p[0]).join('').toUpperCase().slice(0, 2)
+    : 'AP'
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
@@ -57,7 +61,7 @@ export function Navbar({ onOpenMobile }: NavbarProps) {
           <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive ring-2 ring-background" />
         </Button>
         <Link href="/profile" className="ml-1" aria-label="Open profile">
-          <Avatar initials={userProfile.avatarInitials} className="size-8" />
+          <Avatar initials={initials} className="size-8" />
         </Link>
       </div>
     </header>

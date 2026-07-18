@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 from app.database.dependencies import get_db
 from app.models.document import Document
 from app.models.document_view import DocumentView
-from app.models.conversation import Message
+from app.models.conversation import Message, Conversation
+from app.models.bookmark import Bookmark
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/dashboard",
@@ -16,11 +19,16 @@ router = APIRouter(
 
 
 @router.get("/ai-questions-today")
-def get_ai_questions_today(db: Session = Depends(get_db)):
+def get_ai_questions_today(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     today = date.today()
     count = (
         db.query(func.count(Message.id))
+        .join(Conversation, Message.conversation_id == Conversation.id)
         .filter(func.date(Message.timestamp) == today)
+        .filter(Conversation.user_id == current_user.id)
         .scalar()
     )
     return {"count": count or 0}
@@ -47,8 +55,36 @@ def get_trending_topics(db: Session = Depends(get_db)):
 
 
 @router.get("/profile")
-def get_profile():
-    return {"name": "Aryan Pandey"}
+def get_profile(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    name = current_user.name
+    initials = "".join(p[0] for p in name.split() if p).upper()
+    docs_read = (
+        db.query(func.count(DocumentView.id))
+        .join(Document, DocumentView.document_id == Document.id)
+        .filter(Document.owner_id == current_user.id)
+        .scalar()
+    )
+    conv_count = (
+        db.query(func.count(Conversation.id))
+        .filter(Conversation.user_id == current_user.id)
+        .scalar()
+    )
+    bm_count = (
+        db.query(func.count(Bookmark.id))
+        .filter(Bookmark.user_id == current_user.id)
+        .scalar()
+    )
+    return {
+        "name": name,
+        "initials": initials,
+        "role": current_user.role,
+        "documents_read": docs_read or 0,
+        "conversations": conv_count or 0,
+        "bookmarks": bm_count or 0,
+    }
 
 
 @router.get("/recently-viewed")
@@ -85,7 +121,10 @@ def track_view(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     total_documents = db.query(Document).count()
 
     books = (
@@ -119,9 +158,13 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
         "active_researchers": active_researchers,
     }
 @router.get("/recent")
-def get_recent_uploads(db: Session = Depends(get_db)):
+def get_recent_uploads(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     documents = (
         db.query(Document)
+        .filter(Document.owner_id == current_user.id)
         .order_by(Document.id.desc())
         .limit(5)
         .all()

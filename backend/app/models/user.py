@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String
+from datetime import datetime
+
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 
 from app.database.database import Base
@@ -17,6 +19,10 @@ class User(Base):
 
     department = Column(String(100))
 
-    role = Column(String(50), default="Researcher")
+    role = Column(String(50), default="USER")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     documents = relationship("Document", back_populates="owner")

@@ -12,8 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.database.dependencies import get_db
 from app.models.document import Document
+from app.models.bookmark import Bookmark
+from app.models.user import User
 from app.schemas.document import DocumentResponse
 from app.services.document_service import DocumentService
+from app.dependencies.auth import get_current_user
 
 
 router = APIRouter(
@@ -45,6 +48,7 @@ def upload_document(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
     document = DocumentService.save_document(
@@ -56,6 +60,7 @@ def upload_document(
         publication_year=publication_year,
         file=file,
         background_tasks=background_tasks,
+        owner_id=current_user.id,
     )
 
     return {
@@ -73,9 +78,15 @@ def upload_document(
 @router.get("/", response_model=list[DocumentResponse])
 def get_documents(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
     documents = DocumentService.get_all_documents(db)
+    bookmarked_ids = set(
+        r[0] for r in db.query(Bookmark.document_id)
+        .filter(Bookmark.user_id == current_user.id)
+        .all()
+    )
 
     def derive_ocr_status(doc) -> str:
         if not doc.is_scanned:
@@ -96,7 +107,8 @@ def get_documents(
             fileSize=format_size(doc.file_size),
             pages=doc.page_count,
             keywords=[],
-            bookmarked=False,
+            bookmarked=doc.id in bookmarked_ids,
+            owner_id=doc.owner_id,
             ocr_status=derive_ocr_status(doc),
             ocr_page_current=doc.ocr_page_current,
             ocr_page_total=doc.ocr_page_total,
@@ -134,6 +146,92 @@ def search_documents(
             "author": doc.author,
         }
         for doc in results
+    ]
+
+
+# ==========================================================
+# Bookmark toggle
+# ==========================================================
+
+@router.post("/{document_id}/bookmark")
+def toggle_bookmark(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    existing = (
+        db.query(Bookmark)
+        .filter(
+            Bookmark.document_id == document_id,
+            Bookmark.user_id == current_user.id,
+        )
+        .first()
+    )
+    if existing:
+        db.delete(existing)
+        db.commit()
+        return {"bookmarked": False}
+    else:
+        bm = Bookmark(document_id=document_id, user_id=current_user.id)
+        db.add(bm)
+        db.commit()
+        return {"bookmarked": True}
+
+
+# ==========================================================
+# List bookmarked documents
+# ==========================================================
+
+@router.get("/bookmarked")
+def get_bookmarked_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_ids = [
+        r[0] for r in
+        db.query(Bookmark.document_id)
+        .filter(Bookmark.user_id == current_user.id)
+        .order_by(Bookmark.created_at.desc())
+        .all()
+    ]
+    if not doc_ids:
+        return []
+
+    from sqlalchemy import case
+    ordering = case({id: i for i, id in enumerate(doc_ids)}, value=Document.id)
+    documents = (
+        db.query(Document)
+        .filter(Document.id.in_(doc_ids))
+        .order_by(ordering)
+        .all()
+    )
+
+    def derive_ocr_status(doc) -> str:
+        if not doc.is_scanned:
+            return "text"
+        if doc.ocr_completed:
+            return "completed"
+        return "pending"
+
+    return [
+        DocumentResponse(
+            id=doc.id,
+            title=doc.title,
+            author=doc.author,
+            department=doc.department,
+            year=doc.publication_year,
+            type=doc.category,
+            fileName=doc.file_name,
+            fileSize=format_size(doc.file_size),
+            pages=doc.page_count,
+            keywords=[],
+            bookmarked=True,
+            owner_id=doc.owner_id,
+            ocr_status=derive_ocr_status(doc),
+            ocr_page_current=doc.ocr_page_current,
+            ocr_page_total=doc.ocr_page_total,
+        )
+        for doc in documents
     ]
 
 
@@ -212,18 +310,31 @@ def view_document(
 def delete_document(
     document_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id)
+        .first()
+    )
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        )
+
+    if document.owner_id != current_user.id and current_user.role != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="You can only delete your own documents",
+        )
 
     deleted = DocumentService.delete_document(
         db=db,
         document_id=document_id,
     )
-
-    if not deleted:
-        raise HTTPException(
-            status_code=404,
-            detail="Document not found",
-        )
 
     return {
         "message": "Document deleted successfully.",

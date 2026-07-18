@@ -19,6 +19,8 @@ class DocumentResponse(BaseModel):
     keywords: list[str] = []
     bookmarked: bool = False
 
+    owner_id: int | None = None
+
     ocr_status: str = "text"
 
     ocr_page_current: int | None = None

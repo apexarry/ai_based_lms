@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from app.database.dependencies import get_db
 from app.models.conversation import Conversation, Message
+from app.models.user import User
 from app.schemas.assistant import QuestionRequest
+from app.dependencies.auth import get_current_user
 
 from app.services.retrieval_service import RetrievalService
 from app.services.prompt_builder_service import PromptBuilderService
@@ -28,6 +30,7 @@ llm = LLMService()
 def ask_question(
     request: QuestionRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
     # ==========================================================
@@ -43,13 +46,19 @@ def ask_question(
             .first()
         )
         if not conversation:
-            conversation = Conversation()
+            conversation = Conversation(user_id=current_user.id)
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+            conversation_id = conversation.id
+        elif conversation.user_id != current_user.id:
+            conversation = Conversation(user_id=current_user.id)
             db.add(conversation)
             db.commit()
             db.refresh(conversation)
             conversation_id = conversation.id
     else:
-        conversation = Conversation()
+        conversation = Conversation(user_id=current_user.id)
         db.add(conversation)
         db.commit()
         db.refresh(conversation)

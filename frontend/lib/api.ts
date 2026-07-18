@@ -16,7 +16,7 @@ export interface LibraryDocument {
 }
 
 export async function getDocuments(): Promise<LibraryDocument[]> {
-  const response = await fetch(`${API_BASE}/documents/`);
+  const response = await fetch(`${API_BASE}/documents/`, { headers: authHeaders() });
 
   if (!response.ok) {
     throw new Error("Failed to fetch documents");
@@ -35,16 +35,30 @@ export interface DashboardStats {
 
 export interface DashboardProfile {
   name: string
+  initials: string
+  role: string
+  documents_read: number
+  conversations: number
+  bookmarks: number
+}
+
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export async function getDashboardProfile(): Promise<DashboardProfile> {
-  const res = await fetch(`${API_BASE}/dashboard/profile`)
+  const res = await fetch(`${API_BASE}/dashboard/profile`, { headers: authHeaders() })
   if (!res.ok) throw new Error("Failed to fetch profile")
   return res.json()
 }
 
+export async function getProfile(): Promise<DashboardProfile> {
+  return getDashboardProfile()
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const response = await fetch(`${API_BASE}/dashboard/stats`)
+  const response = await fetch(`${API_BASE}/dashboard/stats`, { headers: authHeaders() })
 
   if (!response.ok) {
     throw new Error("Failed to fetch dashboard stats")
@@ -56,6 +70,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function uploadDocument(formData: FormData) {
   const response = await fetch(`${API_BASE}/documents/upload`, {
     method: "POST",
+    headers: authHeaders(),
     body: formData,
   });
 
@@ -86,7 +101,7 @@ export interface RecentUpload {
 }
 
 export async function getRecentUploads(): Promise<RecentUpload[]> {
-  const response = await fetch(`${API_BASE}/dashboard/recent`)
+  const response = await fetch(`${API_BASE}/dashboard/recent`, { headers: authHeaders() })
 
   if (!response.ok) {
     throw new Error("Failed to fetch recent uploads")
@@ -106,7 +121,7 @@ export async function trackDocumentView(documentId: number) {
 }
 
 export async function getAiQuestionsToday() {
-  const res = await fetch(`${API_BASE}/dashboard/ai-questions-today`)
+  const res = await fetch(`${API_BASE}/dashboard/ai-questions-today`, { headers: authHeaders() })
   if (!res.ok) throw new Error("Failed to fetch AI questions")
   return res.json()
 }
@@ -147,13 +162,13 @@ export interface ConversationDetail extends ConversationSummary {
 }
 
 export async function getConversations(): Promise<ConversationSummary[]> {
-  const res = await fetch(`${API_BASE}/conversations/`)
+  const res = await fetch(`${API_BASE}/conversations/`, { headers: authHeaders() })
   if (!res.ok) throw new Error("Failed to fetch conversations")
   return res.json()
 }
 
 export async function createConversation(): Promise<ConversationSummary> {
-  const res = await fetch(`${API_BASE}/conversations/`, { method: "POST" })
+  const res = await fetch(`${API_BASE}/conversations/`, { method: "POST", headers: authHeaders() })
   if (!res.ok) throw new Error("Failed to create conversation")
   return res.json()
 }
@@ -183,7 +198,7 @@ export async function deleteConversation(id: number) {
 export async function askQuestion(question: string, conversationId?: number | null) {
   const res = await fetch(`${API_BASE}/assistant/ask`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({
       question,
       conversation_id: conversationId ?? null,
@@ -203,6 +218,18 @@ export async function searchDocuments(q: string): Promise<SearchResult[]> {
   if (!q.trim()) return []
   const res = await fetch(`${API_BASE}/documents/search?q=${encodeURIComponent(q)}`)
   if (!res.ok) throw new Error("Search failed")
+  return res.json()
+}
+
+export async function toggleBookmark(documentId: number): Promise<{ bookmarked: boolean }> {
+  const res = await fetch(`${API_BASE}/documents/${documentId}/bookmark`, { method: "POST", headers: authHeaders() })
+  if (!res.ok) throw new Error("Failed to toggle bookmark")
+  return res.json()
+}
+
+export async function getBookmarkedDocuments(): Promise<LibraryDocument[]> {
+  const res = await fetch(`${API_BASE}/documents/bookmarked`, { headers: authHeaders() })
+  if (!res.ok) throw new Error("Failed to fetch bookmarked documents")
   return res.json()
 }
 

@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useAuth } from '@/lib/auth-context'
 import { Bookmark, Download, Eye, FolderOpen, User, Calendar, Trash2 } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { docTypeIcons, fallbackIcon } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { toggleBookmark } from '@/lib/api'
 import type { LibraryDocument } from '@/types'
 
 
@@ -19,6 +21,8 @@ interface DocumentCardProps {
 
 export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
   const [bookmarked, setBookmarked] = useState(doc.bookmarked)
+  const { user } = useAuth()
+  const canDelete = user && (doc.owner_id === user.id || user.role === 'ADMIN')
 
   const Icon =
     docTypeIcons[doc.type as keyof typeof docTypeIcons] ?? fallbackIcon
@@ -44,10 +48,12 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
 
     try {
 
+      const token = localStorage.getItem('access_token')
       const response = await fetch(
         `${API_BASE}/documents/${doc.id}`,
         {
           method: "DELETE",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         }
       )
 
@@ -113,19 +119,23 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
             <Download className="size-4" />
           </Button>
 
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label="Delete"
-            onClick={deleteDocument}
-          >
-            <Trash2 className="size-4 text-red-500" />
-          </Button>
+          {canDelete && (
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Delete"
+              onClick={deleteDocument}
+            >
+              <Trash2 className="size-4 text-red-500" />
+            </Button>
+          )}
 
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => setBookmarked((b) => !b)}
+            onClick={() => {
+              toggleBookmark(doc.id).then((r) => setBookmarked(r.bookmarked)).catch(() => {})
+            }}
             aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'}
           >
             <Bookmark
@@ -157,7 +167,9 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
         </div>
 
         <button
-          onClick={() => setBookmarked((b) => !b)}
+          onClick={() => {
+            toggleBookmark(doc.id).then((r) => setBookmarked(r.bookmarked)).catch(() => {})
+          }}
           className="text-muted-foreground transition-colors hover:text-primary"
           aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark'}
         >
@@ -248,14 +260,16 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
           <Download className="size-4" />
         </Button>
 
-        <Button
-          variant="outline"
-          size="icon-sm"
-          aria-label="Delete"
-          onClick={deleteDocument}
-        >
-          <Trash2 className="size-4 text-red-500" />
-        </Button>
+        {canDelete && (
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label="Delete"
+            onClick={deleteDocument}
+          >
+            <Trash2 className="size-4 text-red-500" />
+          </Button>
+        )}
       </div>
     </Card>
   )

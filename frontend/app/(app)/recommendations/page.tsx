@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { getRecommendations } from '@/lib/api'
+
+const API_BASE = 'http://127.0.0.1:8000'
 import type { Recommendation } from '@/lib/api'
 import {
   Bot,
@@ -120,7 +122,10 @@ export default function RecommendationsPage() {
                 )}
 
                 <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-                  <button className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90">
+                  <button
+                    onClick={() => window.open(`${API_BASE}/documents/${doc.id}/view`, '_blank', 'noopener,noreferrer')}
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                  >
                     <TrendingUp className="size-3.5" />
                     View Document
                   </button>

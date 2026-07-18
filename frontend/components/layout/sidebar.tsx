@@ -1,12 +1,14 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { LogOut, PanelLeftClose, PanelLeft, X } from 'lucide-react'
 import { navItems } from '@/lib/nav'
 import { Brand } from '@/components/brand'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/lib/auth-context'
 
 interface SidebarProps {
   collapsed: boolean
@@ -22,6 +24,14 @@ export function Sidebar({
   onCloseMobile,
 }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, logout } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+
+  const visibleItems = useMemo(
+    () => navItems.filter((item) => !item.adminOnly || isAdmin),
+    [isAdmin],
+  )
 
   return (
     <>
@@ -64,7 +74,7 @@ export function Sidebar({
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Primary">
           <ul className="flex flex-col gap-1">
-            {navItems.map((item) => {
+            {visibleItems.map((item) => {
               const active =
                 pathname === item.href || pathname.startsWith(item.href + '/')
               const Icon = item.icon
@@ -99,17 +109,17 @@ export function Sidebar({
 
         {/* Footer actions */}
         <div className="border-t border-sidebar-border p-3">
-          <Link
-            href="/"
+          <button
+            onClick={() => { logout(); router.push('/') }}
             title={collapsed ? 'Logout' : undefined}
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive',
+              'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive',
               collapsed && 'lg:justify-center lg:px-0',
             )}
           >
             <LogOut className="size-[18px] shrink-0" />
             <span className={cn(collapsed && 'lg:hidden')}>Logout</span>
-          </Link>
+          </button>
           <button
             onClick={onToggleCollapse}
             className={cn(

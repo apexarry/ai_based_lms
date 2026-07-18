@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.database.dependencies import get_db
 from app.models.conversation import Conversation, Message
+from app.models.user import User
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(
     prefix="/conversations",
@@ -17,9 +19,11 @@ router = APIRouter(
 def list_conversations(
     limit: int = 20,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     conversations = (
         db.query(Conversation)
+        .filter(Conversation.user_id == current_user.id)
         .order_by(Conversation.updated_at.desc())
         .limit(limit)
         .all()
@@ -38,10 +42,12 @@ def list_conversations(
 @router.post("/")
 def create_conversation(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     conversation = Conversation(
         title="New conversation",
         preview="",
+        user_id=current_user.id,
     )
     db.add(conversation)
     db.commit()
