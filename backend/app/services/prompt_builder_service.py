@@ -1,5 +1,5 @@
 class PromptBuilderService:
-    def build_prompt(self, question: str, context: str, intent: str, document=None):
+    def build_prompt(self, question: str, context: str, intent: str, document=None, documents=None):
         document_name = document.title if document else "the retrieved document"
 
         if intent == "overview":
@@ -8,10 +8,21 @@ class PromptBuilderService:
                 "Cover only points supported by the retrieved context."
             )
         elif intent == "compare":
-            task = (
-                "Compare only facts that are present in the retrieved context. "
-                "If the context does not cover both sides of the comparison, say so."
-            )
+            names = [d.title for d in documents] if documents else []
+            if names:
+                task = (
+                    f"You are comparing these documents: {' vs '.join(names)}. "
+                    "The context below contains excerpts from both. "
+                    "Compare only facts present in the retrieved context. "
+                    "Clearly attribute each point to its source document using the source label. "
+                    "If the context lacks information about one side, say so explicitly."
+                )
+            else:
+                task = (
+                    "You are comparing information from different documents. "
+                    "Compare only facts present in the retrieved context. "
+                    "Clearly attribute each point to its source document using the source label."
+                )
         elif intent == "recommendation":
             task = (
                 "Recommend only documents represented in the retrieved context, "

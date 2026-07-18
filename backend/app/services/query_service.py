@@ -100,11 +100,11 @@ class QueryService:
             "find documents",
         ]
 
-        if any(keyword in question for keyword in overview_keywords):
-            return "overview"
-
         if any(keyword in question for keyword in compare_keywords):
             return "compare"
+
+        if any(keyword in question for keyword in overview_keywords):
+            return "overview"
 
         if any(keyword in question for keyword in recommendation_keywords):
             return "recommendation"
@@ -113,6 +113,51 @@ class QueryService:
             return "list"
 
         return "question"
+
+    def detect_documents(
+        self,
+        question: str,
+        db: Session,
+        threshold: int = 55,
+    ) -> list:
+        question_lower = question.lower().strip()
+
+        # Strip common noise words for better matching
+        clean = question_lower
+        for noise in ["compare ", "comparing ", "difference between ", "similarity between "]:
+            clean = clean.replace(noise, "")
+
+        for sep in [" versus ", " vs ", " with ", " and "]:
+            if sep in clean:
+                parts = clean.split(sep, maxsplit=1)
+                candidates = []
+                for part in parts:
+                    doc = self.detect_document(part.strip(), db, threshold)
+                    if doc:
+                        candidates.append(doc)
+
+                if len(candidates) >= 2:
+                    return candidates[:2]
+
+                # Fallback: try matching each part against all document titles
+                # using token overlap for short/abbreviated names
+                all_docs = db.query(Document).all()
+                for part in parts:
+                    words = set(part.strip().split())
+                    best = None
+                    best_score = 0
+                    for d in all_docs:
+                        title_words = set(d.title.lower().split())
+                        overlap = len(words & title_words)
+                        if overlap > best_score:
+                            best_score = overlap
+                            best = d
+                    if best and best_score >= 1 and best not in candidates:
+                        candidates.append(best)
+
+                return candidates[:2]
+
+        return []
 
     def understand_query(
         self,
@@ -126,6 +171,8 @@ class QueryService:
             question,
             db,
         )
+
+        documents = self.detect_documents(question, db) if intent == "compare" else []
 
         retrieval_strategy = {
             "overview": "intro_first",
@@ -143,10 +190,14 @@ class QueryService:
         print(
             f"Detected Document   : {document.title if document else 'None'}"
         )
+        if documents:
+            print(f"Documents to compare: {[d.title for d in documents]}")
         print("=" * 80)
 
         return {
             "intent": intent,
             "document": document,
+            "documents": documents,
             "retrieval_strategy": retrieval_strategy,
+            "_raw_question": question,
         }

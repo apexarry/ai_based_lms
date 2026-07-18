@@ -33,6 +33,16 @@ export interface DashboardStats {
   active_researchers: number
 }
 
+export interface DashboardProfile {
+  name: string
+}
+
+export async function getDashboardProfile(): Promise<DashboardProfile> {
+  const res = await fetch(`${API_BASE}/dashboard/profile`)
+  if (!res.ok) throw new Error("Failed to fetch profile")
+  return res.json()
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const response = await fetch(`${API_BASE}/dashboard/stats`)
 
@@ -83,6 +93,28 @@ export async function getRecentUploads(): Promise<RecentUpload[]> {
   }
 
   return response.json()
+}
+
+export async function getRecentlyViewed() {
+  const res = await fetch(`${API_BASE}/dashboard/recently-viewed`)
+  if (!res.ok) throw new Error("Failed to fetch recently viewed")
+  return res.json()
+}
+
+export async function trackDocumentView(documentId: number) {
+  await fetch(`${API_BASE}/dashboard/track-view/${documentId}`, { method: "POST" })
+}
+
+export async function getAiQuestionsToday() {
+  const res = await fetch(`${API_BASE}/dashboard/ai-questions-today`)
+  if (!res.ok) throw new Error("Failed to fetch AI questions")
+  return res.json()
+}
+
+export async function getTrendingTopics() {
+  const res = await fetch(`${API_BASE}/dashboard/trending`)
+  if (!res.ok) throw new Error("Failed to fetch trending")
+  return res.json()
 }
 
 export interface Recommendation {
@@ -158,6 +190,19 @@ export async function askQuestion(question: string, conversationId?: number | nu
     }),
   })
   if (!res.ok) throw new Error("Failed to get answer")
+  return res.json()
+}
+
+export interface SearchResult {
+  id: number
+  title: string
+  author: string
+}
+
+export async function searchDocuments(q: string): Promise<SearchResult[]> {
+  if (!q.trim()) return []
+  const res = await fetch(`${API_BASE}/documents/search?q=${encodeURIComponent(q)}`)
+  if (!res.ok) throw new Error("Search failed")
   return res.json()
 }
 

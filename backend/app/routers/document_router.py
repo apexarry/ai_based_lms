@@ -105,6 +105,38 @@ def get_documents(
     ]
 
 
+# ==========================================================
+# Search
+# ==========================================================
+
+@router.get("/search")
+def search_documents(
+    q: str = "",
+    db: Session = Depends(get_db),
+):
+    if not q.strip():
+        return []
+
+    results = (
+        db.query(Document)
+        .filter(
+            (Document.title.ilike(f"%{q}%"))
+            | (Document.author.ilike(f"%{q}%"))
+        )
+        .limit(10)
+        .all()
+    )
+
+    return [
+        {
+            "id": doc.id,
+            "title": doc.title,
+            "author": doc.author,
+        }
+        for doc in results
+    ]
+
+
 @router.post("/reindex")
 def reindex_documents(
     db: Session = Depends(get_db),

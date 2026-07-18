@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Bell, Menu, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar } from '@/components/ui/avatar'
-import { SearchBar } from '@/components/search-bar'
+import { SearchDropdown } from '@/components/search-dropdown'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { breadcrumbLabels } from '@/lib/nav'
 import { userProfile } from '@/lib/mock-data'
@@ -42,7 +42,7 @@ export function Navbar({ onOpenMobile }: NavbarProps) {
 
       {/* Search */}
       <div className="ml-auto hidden w-full max-w-md md:block">
-        <SearchBar showShortcut />
+        <SearchDropdown />
       </div>
 
       <div className="ml-auto flex items-center gap-1 md:ml-0">

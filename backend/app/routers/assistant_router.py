@@ -118,6 +118,7 @@ def ask_question(
             context=context,
             intent=query["intent"],
             document=query["document"],
+            documents=query.get("documents"),
         )
 
         llm_messages.append({

@@ -25,6 +25,7 @@ export function DocumentCard({ doc, view = 'grid' }: DocumentCardProps) {
 
   const openDocument = () => {
     window.open(`${API_BASE}/documents/${doc.id}/view`, "_blank")
+    fetch(`${API_BASE}/dashboard/track-view/${doc.id}`, { method: "POST" }).catch(() => {})
   }
 
   const downloadDocument = () => {

@@ -44,10 +44,14 @@ export function ActivityList({
             docTypeIcons[item.type as keyof typeof docTypeIcons] ??
             fallbackIcon
 
+          const docUrl = `http://127.0.0.1:8000/documents/${item.id}/view`
           return (
-            <div
+            <a
               key={item.id}
-              className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0"
+              href={docUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 transition-colors hover:bg-muted/50 -mx-3 px-3"
               style={{ animationDelay: `${i * 40}ms` }}
             >
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -67,7 +71,7 @@ export function ActivityList({
               <span className="shrink-0 text-xs text-muted-foreground">
                 {item.time}
               </span>
-            </div>
+            </a>
           )
         })}
       </CardContent>

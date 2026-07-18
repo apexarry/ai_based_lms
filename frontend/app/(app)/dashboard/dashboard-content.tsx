@@ -10,14 +10,7 @@ import { StatCard } from '@/components/cards/stat-card'
 import { ActivityList } from '@/components/dashboard/activity-list'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
-import {
-  recentlyViewed,
-  recentConversations,
-  trendingTopics,
-  userProfile,
-} from '@/lib/mock-data'
-
-import { getDashboardStats, getRecentUploads } from '@/lib/api'
+import { getDashboardStats, getRecentUploads, getDashboardProfile, getRecentlyViewed, getConversations, getAiQuestionsToday, getTrendingTopics } from '@/lib/api'
 
 export function DashboardContent() {
   const [stats, setStats] = useState({
@@ -28,15 +21,32 @@ export function DashboardContent() {
     active_researchers: 0,
   })
   const [recentUploads, setRecentUploads] = useState<any[]>([])
+  const [profileName, setProfileName] = useState("Researcher")
+  const [recentlyViewed, setRecentlyViewed] = useState<any[]>([])
+  const [recentConvs, setRecentConvs] = useState<any[]>([])
+  const [aiQuestions, setAiQuestions] = useState(0)
+  const [trendingTopics, setTrendingTopics] = useState<any[]>([])
 
   useEffect(() => {
     async function loadData() {
         try {
-            const statsData = await getDashboardStats()
+            const [statsData, uploads, profile, viewed, convs, aiq, trending] = await Promise.all([
+              getDashboardStats(),
+              getRecentUploads(),
+              getDashboardProfile(),
+              getRecentlyViewed(),
+              getConversations(),
+              getAiQuestionsToday(),
+              getTrendingTopics(),
+            ])
             setStats(statsData)
-
-            const uploads = await getRecentUploads()
             setRecentUploads(uploads)
+            const first = profile.name.split(' ')[0]
+            setProfileName(first)
+            setRecentlyViewed(viewed)
+            setRecentConvs(convs.slice(0, 5))
+            setAiQuestions(aiq.count ?? 0)
+            setTrendingTopics(trending)
         } catch (err) {
             console.error(err)
         }
@@ -80,7 +90,7 @@ export function DashboardContent() {
     {
       id: 'ai',
       label: 'AI Questions Today',
-      value: '-',
+      value: aiQuestions.toString(),
       change: '',
       trend: 'neutral',
       icon: 'Bot',
@@ -98,7 +108,7 @@ export function DashboardContent() {
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <PageHeader
-        title={`Welcome back, ${userProfile.name.split(' ')[1]}`}
+        title={`Welcome back, ${profileName}`}
         description="Here is an overview of the knowledge library and your recent research activity."
       >
         <QuickActions />
@@ -144,7 +154,7 @@ export function DashboardContent() {
           </CardHeader>
 
           <CardContent className="flex flex-col">
-            {recentConversations.map((c, i) => (
+            {recentConvs.map((c, i) => (
               <Link
                 key={c.id}
                 href="/assistant"
@@ -166,8 +176,8 @@ export function DashboardContent() {
                 </div>
 
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {c.time}
-                </span>
+                    {c.date || c.time || ""}
+                  </span>
               </Link>
             ))}
           </CardContent>
@@ -182,10 +192,15 @@ export function DashboardContent() {
           </CardHeader>
 
           <CardContent className="flex flex-col">
-            {trendingTopics.map((t, i) => (
-              <div
-                key={t.id}
-                className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0"
+            {trendingTopics.map((t, i) => {
+              const docUrl = `http://127.0.0.1:8000/documents/${t.id}/view`
+              return (
+              <a
+                key={t.id ?? i}
+                href={docUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 border-t border-border py-3 first:border-t-0 first:pt-0 transition-colors hover:bg-muted/50 -mx-3 px-3"
               >
                 <span className="font-mono text-sm font-semibold text-muted-foreground/70">
                   {String(i + 1).padStart(2, '0')}
@@ -201,12 +216,15 @@ export function DashboardContent() {
                   </p>
                 </div>
 
-                <span className="inline-flex items-center gap-0.5 rounded-md bg-success/12 px-1.5 py-0.5 text-xs font-medium text-success">
-                  <TrendingUp className="size-3" />
-                  {t.change}
-                </span>
-              </div>
-            ))}
+                {t.change && (
+                  <span className="inline-flex items-center gap-0.5 rounded-md bg-success/12 px-1.5 py-0.5 text-xs font-medium text-success">
+                    <TrendingUp className="size-3" />
+                    {t.change}
+                  </span>
+                )}
+              </a>
+            )
+          })}
           </CardContent>
         </Card>
       </div>

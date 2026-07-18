@@ -49,7 +49,8 @@ class RetrievalService:
         if strategy == "intro_first" and document:
 
             print("\nOverview request detected.")
-            print(f"Selected document: {document.title}")
+            safe_title = document.title.encode("ascii", errors="replace").decode("ascii")
+            print(f"Selected document: {safe_title}")
 
             chunks = self.chroma_service.get_document_chunks(
                 document.id,
@@ -73,26 +74,78 @@ class RetrievalService:
             }
 
         # ==========================================================
-        # SEMANTIC RETRIEVAL + RERANKING
+        # COMPARE RETRIEVAL (multi-document)
         # ==========================================================
 
-        question_embedding = self.embedding_service.generate_embedding(
-            question,
-        )
+        if strategy == "compare" and query.get("documents"):
+            docs_to_compare = query["documents"]
+            print(f"\nCompare mode — retrieving from {len(docs_to_compare)} documents:")
 
-        if document:
-            print(f"\nSemantic search inside '{document.title}'")
-            raw_results = self.chroma_service.search(
-                embedding=question_embedding,
-                n_results=self.N_FETCH,
-                where={"document_id": document.id},
-            )
+            # Use the raw question to extract per-doc sub-queries
+            raw_question = query.get("_raw_question", question)
+            import re
+            parts = re.split(r"\s+(?:versus|vs|with|and)\s+", raw_question.lower(), maxsplit=1)
+            sub_queries = [p.strip() for p in parts]
+
+            per_doc_top = max(3, self.TOP_K)
+            all_raw_docs = []
+            all_raw_meta = []
+
+            per_doc_lists = []
+            for i, d in enumerate(docs_to_compare):
+                sq = sub_queries[i] if i < len(sub_queries) else question
+                emb = self.embedding_service.generate_embedding(sq)
+                res = self.chroma_service.search(
+                    embedding=emb,
+                    n_results=per_doc_top,
+                    where={"document_id": d.id},
+                )
+                per_doc_lists.append((
+                    res.get("documents", [[]])[0] or [],
+                    res.get("metadatas", [[]])[0] or [],
+                ))
+
+            # Interleave: take one from each doc in round-robin, max TOP_K total
+            max_len = max(len(lst[0]) for lst in per_doc_lists)
+            count = 0
+            for idx in range(max_len):
+                if count >= self.TOP_K:
+                    break
+                for lst in per_doc_lists:
+                    if count >= self.TOP_K:
+                        break
+                    if idx < len(lst[0]):
+                        all_raw_docs.append(lst[0][idx])
+                        all_raw_meta.append(lst[1][idx])
+                        count += 1
+
+            print(f"Retrieved {len(all_raw_docs)} chunks total from compare.")
+            return {
+                "query": query,
+                "results": {
+                    "documents": [all_raw_docs],
+                    "metadatas": [all_raw_meta],
+                },
+            }
         else:
-            print("\nSemantic search across entire library")
-            raw_results = self.chroma_service.search(
-                embedding=question_embedding,
-                n_results=self.N_FETCH,
+            question_embedding = self.embedding_service.generate_embedding(
+                question,
             )
+
+            if document:
+                safe_title = document.title.encode("ascii", errors="replace").decode("ascii")
+                print(f"\nSemantic search inside '{safe_title}'")
+                raw_results = self.chroma_service.search(
+                    embedding=question_embedding,
+                    n_results=self.N_FETCH,
+                    where={"document_id": document.id},
+                )
+            else:
+                print("\nSemantic search across entire library")
+                raw_results = self.chroma_service.search(
+                    embedding=question_embedding,
+                    n_results=self.N_FETCH,
+                )
 
         raw_docs = raw_results.get("documents", [[]])[0] or []
         raw_meta = raw_results.get("metadatas", [[]])[0] or []
@@ -149,16 +202,18 @@ class RetrievalService:
         print("=" * 80)
 
         for i, chunk in enumerate(reranked_docs):
+            safe = chunk[:800].encode("ascii", errors="replace").decode("ascii")
             print(f"\nChunk {i + 1}  (score: {scores[i]:.4f})")
             print("-" * 40)
-            print(chunk[:800])
+            print(safe)
 
         print("\n" + "=" * 80)
         print("METADATA")
         print("=" * 80)
 
         for meta in reranked_meta:
-            print(meta)
+            safe = str(meta).encode("ascii", errors="replace").decode("ascii")
+            print(safe)
 
         print("\n" + "=" * 80)
         print(f"Returning {len(reranked_docs)} chunks.")

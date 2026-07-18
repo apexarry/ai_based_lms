@@ -1,14 +1,87 @@
+from datetime import datetime, date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database.dependencies import get_db
 from app.models.document import Document
+from app.models.document_view import DocumentView
+from app.models.conversation import Message
 
 router = APIRouter(
     prefix="/dashboard",
     tags=["Dashboard"],
 )
+
+
+@router.get("/ai-questions-today")
+def get_ai_questions_today(db: Session = Depends(get_db)):
+    today = date.today()
+    count = (
+        db.query(func.count(Message.id))
+        .filter(func.date(Message.timestamp) == today)
+        .scalar()
+    )
+    return {"count": count or 0}
+
+
+@router.get("/trending")
+def get_trending_topics(db: Session = Depends(get_db)):
+    results = (
+        db.query(
+            DocumentView.document_id,
+            Document.title,
+            func.count(DocumentView.id).label("view_count"),
+        )
+        .join(Document, DocumentView.document_id == Document.id)
+        .group_by(DocumentView.document_id, Document.title)
+        .order_by(func.count(DocumentView.id).desc())
+        .limit(5)
+        .all()
+    )
+    return [
+        {"id": r.document_id, "topic": r.title, "count": r.view_count}
+        for r in results
+    ]
+
+
+@router.get("/profile")
+def get_profile():
+    return {"name": "Aryan Pandey"}
+
+
+@router.get("/recently-viewed")
+def get_recently_viewed(db: Session = Depends(get_db)):
+    views = (
+        db.query(DocumentView)
+        .order_by(DocumentView.viewed_at.desc())
+        .limit(5)
+        .all()
+    )
+    results = []
+    seen = set()
+    for v in views:
+        if v.document_id in seen:
+            continue
+        seen.add(v.document_id)
+        d = v.document
+        results.append({
+            "id": d.id,
+            "title": d.title,
+            "author": d.author,
+            "type": d.category,
+            "time": v.viewed_at.isoformat() if v.viewed_at else "Just now",
+        })
+    return results
+
+
+@router.post("/track-view/{document_id}")
+def track_view(document_id: int, db: Session = Depends(get_db)):
+    v = DocumentView(document_id=document_id)
+    db.add(v)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/stats")
